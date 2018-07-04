@@ -11,6 +11,7 @@ p = r'files/pending'
 cookie_q = Queue()
 
 
+# This will be depreciated in the version 1.3
 def read_files(p):
     """Read files from 'pending'
     """
@@ -109,6 +110,7 @@ def read_files(p):
     return urls
 
 
+# This will be depreciated in the version 1.3
 def cookie_jar(c):
     """Create a list of cookies
     """
