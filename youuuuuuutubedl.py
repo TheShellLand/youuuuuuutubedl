@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 #
 # Author: naisanza@gmail.com
-# Version: 1.2.1
 
 
 import re
@@ -24,9 +23,6 @@ from subprocess import PIPE
 from bs4 import BeautifulSoup
 from concurrent.futures import (ThreadPoolExecutor, wait, as_completed)
 
-
-# This will be depreciated in the version 1.3
-import helpers.operations as ops
 
 FORMAT = '%(asctime)s  [%(levelname)s ] %(message)s'
 FORMAT = '[%(levelname)s ] %(message)s'
@@ -88,7 +84,7 @@ class Youtube:
         urls = len(self.urls)
 
         if urls > 1:
-                logging.info('[Youtube] {} urls added to queue'.format(urls))
+            logging.info('[Youtube] {} urls added to queue'.format(urls))
         else:
             logging.info('[Youtube] {} url added to queue'.format(urls))
 
@@ -565,8 +561,18 @@ def run_queue(thread_pool):
 # This will be depreciated in the version 1.3
 def main():
     """Main
-    """
 
+    """
+    while True:
+        Youtube()
+        print('sleep for 3600')
+        time.sleep(3600)
+
+
+def test_main():
+    """Main
+
+    """
     Youtube()
 
 
