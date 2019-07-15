@@ -1,4 +1,12 @@
 stages:
+- name: Test
+  steps:
+  - runScriptConfig:
+      image: python:3
+      shellScript: |-
+        python3 -m pip install pytest
+        python3 -m pip install -r requirements.txt
+        pytest tests
 - name: Build
   steps:
   - publishImageConfig:
