@@ -20,6 +20,31 @@ from bs4 import BeautifulSoup
 from concurrent.futures import (ThreadPoolExecutor, wait, as_completed)
 
 from automon.log import Logging
+from automon.helpers.sanitation import Sanitation
+
+
+class Url:
+    url = str
+    name = str
+    folder = str
+
+    def __init__(self, url: str, name: str = '', folder: str = ''):
+
+        self.url = url
+        self.name = name
+        self.folder = folder
+
+    def __str__(self):
+        if self.folder or self.name:
+            return f'{self.folder} {self.name} {self.url}'
+        else:
+            return f'{self.url}'
+
+    def __eq__(self, other):
+        if isinstance(other, Url):
+            return self.url == self.url
+        else:
+            return False
 
 
 class Youtube:
@@ -28,7 +53,7 @@ class Youtube:
         """A multithreaded wrapper for youtube-dl
         """
 
-        self._log = Logging(Youtube.__name__, self._log.debug)
+        self._log = Logging(Youtube.__name__, Logging.DEBUG)
 
         # Directories
         self.path = os.path.split(os.path.realpath(__file__))[0]
@@ -89,7 +114,7 @@ class Youtube:
 
             if self._cpu_usage(80):
                 url = self.queue.get()
-                self.futures.append(self.pool.submit(self._downloader, url))
+                self.futures.append(self.pool.submit(self._download, url))
                 urls = urls - 1
                 self._log.info('[Youtube] {} left'.format(urls))
                 sleep = int(sleep / 2)
@@ -108,7 +133,7 @@ class Youtube:
             self._log.debug('[_cpu_usage] cpu usage: {}'.format(psutil.cpu_percent()))
             return False
 
-    def _url_builder(self):
+    def _url_builder(self) -> [Url]:
         """Create a clean list of urls
 
         You can put any text file or html file into files/pending
@@ -117,17 +142,15 @@ class Youtube:
         and create a list of URLs from it
         """
 
-        urls = self._read_files(self.dir_p)
+        return self._read_files(self.dir_p)
 
-        return urls
-
-    def _read_files(self, directory):
+    def _read_files(self, directory) -> [Url]:
         """Read files from 'pending'
         """
 
         urls = []
 
-        def html_file(f):
+        def html_file(f: str) -> [Url.url]:
             """Read HTML file
             """
 
@@ -145,7 +168,7 @@ class Youtube:
 
             return urls
 
-        def get_page(url):
+        def get_page(url: str) -> [Url.url]:
             """Download and parse the page
             """
 
@@ -181,34 +204,39 @@ class Youtube:
 
                 return urls
 
-            for _ in request_page(url):
-                urls.append(_)
+            for page_urls in request_page(url):
+                urls.extend(page_urls)
 
             return urls
 
         for item in os.listdir(directory):
-            _file = os.path.join(directory, item)
+            file_ = os.path.join(directory, item)
 
-            if os.path.isfile(_file):
+            if os.path.isfile(file_):
 
                 fn, fext = os.path.splitext(item)
 
                 # ignore hidden files
                 if not fn.startswith('.') and not fn.startswith('#'):
 
-                    with open(_file, 'r') as f:
+                    with open(file_, 'r') as f:
                         if 'html' in fext.lower() or 'htm' in fext.lower():  # HTML file
                             urls.extend(html_file(f))
 
                         else:
                             for line in f.read().splitlines():  # Regular text file
                                 url = line.strip()
-                                if url == '' or line.startswith('#') or line.startswith('/') or url in urls:
+                                if url == '' or line.startswith('#') or line.startswith('/') \
+                                        or url in urls:
                                     continue
-                                elif 'youtube.com' in url.lower():
-                                    urls.append(url)
+
+                                url, name, folder = self._prepare_url(url)
+                                url_ = Url(url, name, folder)
+
+                                if 'youtube.com' in url_.url.lower():
+                                    urls.append(url_)
                                 elif url:
-                                    urls.append(url)
+                                    urls.append(url_)
                                 else:
                                     # TODO: bug - Determine whether to parse the page or not
                                     # If the page needs to be parsed for URLs, parse it
@@ -216,22 +244,25 @@ class Youtube:
 
                                     # for _ in get_page(url):
                                     #     urls.append(_)
-                                    urls.append(line)
+                                    urls.append(url_)
         return urls
 
-    def _downloader(self, url):
+    def _download(self, new: Url):
         """Download the url
         """
 
         start = int(time.time())
+
+        url = new.url
+        name = new.name
+        folder = new.folder
 
         # run youtube-dl
         # os.chmod(yt, 0o555)
         dl = self.yt + self.yt_args + url
         dl_audio = self.yt + self.yt_audio_args + url
 
-        regexes = list()
-        regexes.extend([
+        regexes = [
             # merging files into better format
             {'type': 'finished', 'regex': '(?<=Merging formats into ").*(?=")'},
             # file exists
@@ -242,37 +273,12 @@ class Youtube:
             {'type': 'finished', 'regex': '(?<=Destination: ).*mp3'},
             # catch all files
             {'type': 'finished', 'regex': '(?<=Destination: ).*'},
-        ])
+        ]
 
         def run(command):
             """Run a Popen process
             """
             return subprocess.Popen(command.split(), stdout=PIPE, stderr=PIPE).communicate()
-
-        class LogHolder:
-            def __init__(self):
-                """Hold a bunch of logs
-                """
-                self.logs = list()
-
-            def store(self, log):
-                """Logs are expected as a string list
-                """
-                output, error = log
-
-                output = output.decode().splitlines()
-                error = error.decode().splitlines()
-
-                self.logs.extend(output)
-                self.logs.extend(error)
-
-            def pop(self, index=0):
-                """Pop a log off the top
-                """
-                try:
-                    return self.logs.pop(index)
-                except:
-                    return False
 
         logs = LogHolder()
 
@@ -299,8 +305,8 @@ class Youtube:
                 # find matching downloads
                 for r in regexes:
 
-                    regex = r['regex']
-                    r_type = r['type']
+                    regex = r.get('regex')
+                    r_type = r.get('type')
 
                     m = re.search(regex, line)
                     if m:
@@ -331,6 +337,50 @@ class Youtube:
         self._finished(finished)
 
         self._log.info('[_downloader] took {} seconds to complete {}'.format(int(time.time() - start), url))
+
+    def _prepare_url(self, raw_url: str) -> tuple:
+
+        if not isinstance(raw_url, str) and not raw_url:
+            return False
+
+        regex = [
+            ('all', f'(.*),(.*),(.*)'),
+            ('no folder', f'(.*),(.*)'),
+            ('url only', f'(.*)')
+        ]
+
+        for s, r in regex:
+            result = re.search(r, raw_url)
+
+            if result:
+                if s == 'all':
+                    url, name, folder = result.groups()
+
+                if s == 'no folder':
+                    url, name = result.groups()
+                    folder = ''
+
+                if s == 'url only':
+                    url = result.groups()
+                    name = ''
+                    folder = ''
+
+                break
+
+        url = Sanitation.strip_spaces(url)
+        name = Sanitation.strip_spaces(name)
+        folder = Sanitation.strip_spaces(folder)
+
+        return url, name, folder
+
+    def _url(self, raw: str) -> str:
+        return
+
+    def _name(self, raw):
+        return
+
+    def _folder(self, raw):
+        return
 
     def _move_file(self, source, target):
         """Move file including metadata
@@ -395,6 +445,32 @@ class Youtube:
                     pass
 
         return cookies
+
+
+class LogHolder:
+    def __init__(self):
+        """Hold a bunch of logs
+        """
+        self.logs = list()
+
+    def store(self, log):
+        """Logs are expected as a string list
+        """
+        output, error = log
+
+        output = output.decode().splitlines()
+        error = error.decode().splitlines()
+
+        self.logs.extend(output)
+        self.logs.extend(error)
+
+    def pop(self, index=0):
+        """Pop a log off the top
+        """
+        try:
+            return self.logs.pop(index)
+        except:
+            return False
 
 
 #
