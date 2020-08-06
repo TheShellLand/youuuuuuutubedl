@@ -28,15 +28,58 @@ class Url:
     name = str
     folder = str
 
-    def __init__(self, url: str, name: str = '', folder: str = ''):
+    def __init__(self, url: str):
+
+        self._log = Logging(Url.__name__, Logging.DEBUG)
+
+        self._clean = self._prepare_url(url)
+
+        url, name, folder = self._clean
 
         self.url = url
         self.name = name
         self.folder = folder
 
+        self._log.debug(f'{self.__str__()}')
+
+    def _prepare_url(self, raw_url: str) -> tuple:
+
+        if not isinstance(raw_url, str) and not raw_url:
+            return False
+
+        regex = [
+            ('all', f'(.*),(.*),(.*)'),
+            ('no folder', f'(.*),(.*)'),
+            ('url only', f'(.*)')
+        ]
+
+        for s, r in regex:
+            result = re.search(r, raw_url)
+
+            if result:
+                if s == 'all':
+                    url, name, folder = result.groups()
+
+                if s == 'no folder':
+                    url, name = result.groups()
+                    folder = ''
+
+                if s == 'url only':
+                    url = result.groups()[0]
+                    name = ''
+                    folder = ''
+
+                break
+
+        url = Sanitation.strip(url)
+        name = Sanitation.safe_filename(name)
+        folder = Sanitation.safe_foldername(folder)
+
+        return url, name, folder
+
     def __str__(self):
         if self.folder or self.name:
-            return f'{self.folder} {self.name} {self.url}'
+            return f'{self.folder}/{self.name} {self.url}'
         else:
             return f'{self.url}'
 
@@ -97,15 +140,15 @@ class Youtube:
         # Run Downloader
         self.futures = list()
         for url in self.urls:
-            self._log.info('[Youtube] added {}'.format(url))
+            self._log.info('queued: {}'.format(url))
             self.queue.put(url)
 
         urls = len(self.urls)
 
         if urls > 1:
-            self._log.info('[Youtube] {} urls added to queue'.format(urls))
+            self._log.info('{} urls added to queue'.format(urls))
         else:
-            self._log.info('[Youtube] {} url added to queue'.format(urls))
+            self._log.info('{} url added to queue'.format(urls))
 
         sleep = 0
         while True:
@@ -116,7 +159,7 @@ class Youtube:
                 url = self.queue.get()
                 self.futures.append(self.pool.submit(self._download, url))
                 urls = urls - 1
-                self._log.info('[Youtube] {} left'.format(urls))
+                self._log.info('{} left'.format(urls))
                 sleep = int(sleep / 2)
             else:
                 sleep += int(sleep + 1 * 2)
@@ -127,10 +170,10 @@ class Youtube:
         """Limit max cpu usage
         """
         if psutil.cpu_percent() < max_cpu_percentage:
-            self._log.debug('[_cpu_usage] cpu usage: {}'.format(psutil.cpu_percent()))
+            self._log.debug('cpu usage: {}'.format(psutil.cpu_percent()))
             return True
         else:
-            self._log.debug('[_cpu_usage] cpu usage: {}'.format(psutil.cpu_percent()))
+            self._log.debug('cpu usage: {}'.format(psutil.cpu_percent()))
             return False
 
     def _url_builder(self) -> [Url]:
@@ -212,6 +255,8 @@ class Youtube:
         for item in os.listdir(directory):
             file_ = os.path.join(directory, item)
 
+            self._log.debug(f'Parsing: {file_}')
+
             if os.path.isfile(file_):
 
                 fn, fext = os.path.splitext(item)
@@ -226,12 +271,13 @@ class Youtube:
                         else:
                             for line in f.read().splitlines():  # Regular text file
                                 url = line.strip()
-                                if url == '' or line.startswith('#') or line.startswith('/') \
-                                        or url in urls:
+                                if url == '' or line.startswith('#') or line.startswith('/'):
                                     continue
 
-                                url, name, folder = self._prepare_url(url)
-                                url_ = Url(url, name, folder)
+                                url_ = Url(url)
+
+                                if url_ in urls:
+                                    continue
 
                                 if 'youtube.com' in url_.url.lower():
                                     urls.append(url_)
@@ -247,19 +293,23 @@ class Youtube:
                                     urls.append(url_)
         return urls
 
-    def _download(self, new: Url):
+    def _download(self, object: Url):
         """Download the url
         """
 
         start = int(time.time())
 
-        url = new.url
-        name = new.name
-        folder = new.folder
+        url = object.url
+        name = object.name
+        folder = object.folder
 
         # run youtube-dl
         # os.chmod(yt, 0o555)
-        dl = self.yt + self.yt_args + url
+        if name:
+            TEMPLATE = f'-o {name}.%(ext)s'
+            dl = self.yt + self.yt_args + TEMPLATE + url
+        else:
+            dl = self.yt + self.yt_args + url
         dl_audio = self.yt + self.yt_audio_args + url
 
         regexes = [
@@ -278,6 +328,7 @@ class Youtube:
         def run(command):
             """Run a Popen process
             """
+            self._log.debug(f'Run {command}')
             return subprocess.Popen(command.split(), stdout=PIPE, stderr=PIPE).communicate()
 
         logs = LogHolder()
@@ -286,21 +337,21 @@ class Youtube:
         downloads = list()
 
         # Download file
-        self._log.info('[_downloader] Downloading url {}'.format(url))
-        logs.store(run(dl))
+        self._log.info(f'Downloading {object}')
+        # logs.store(run(dl))
 
         # Download audio
         # Requires ffmpeg or avconv and ffprobe or avprobe
-        self._log.info('[] Downloading audio {}'.format(url))
-        logs.store(run(dl_audio))
+        self._log.info(f'Downloading audio {object}')
+        # logs.store(run(dl_audio))
 
         while True:
 
-            line = logs.pop()
+            log = logs.pop()
 
-            if line is not False:
+            if log is not False:
 
-                self._log.debug('[log ] {}'.format(line))
+                self._log.debug(f'[log ] {log}')
 
                 # find matching downloads
                 for r in regexes:
@@ -308,7 +359,7 @@ class Youtube:
                     regex = r.get('regex')
                     r_type = r.get('type')
 
-                    m = re.search(regex, line)
+                    m = re.search(regex, log)
                     if m:
                         g = m.group()
 
@@ -316,17 +367,17 @@ class Youtube:
                         filepath = os.path.join(self.dir_d, filename)
 
                         # don't show line unless it matches
-                        self._log.debug('[_downloader] {}'.format(line))
-                        self._log.debug('[regex] {}'.format(regex))
-                        self._log.debug('[regex] {}'.format(filename))
+                        self._log.debug(f'[_downloader] {log}')
+                        self._log.debug(f'[regex] {regex}')
+                        self._log.debug(f'[regex] {filename}')
 
                         if os.path.exists(filepath):
                             if r_type == 'finished':
-                                self._log.info('[_downloader] finished: {}'.format(filename))
+                                self._log.info(f'finished: {filename}')
                                 if filename not in finished:
                                     finished.append(filename)
                             else:
-                                self._log.info('[_downloader] downloading: {}'.format(filename))
+                                self._log.info(f'downloading: {filename}')
                                 if filename not in downloads:
                                     downloads.append(filename)
                             break
@@ -336,42 +387,7 @@ class Youtube:
         # move all finished files
         self._finished(finished)
 
-        self._log.info('[_downloader] took {} seconds to complete {}'.format(int(time.time() - start), url))
-
-    def _prepare_url(self, raw_url: str) -> tuple:
-
-        if not isinstance(raw_url, str) and not raw_url:
-            return False
-
-        regex = [
-            ('all', f'(.*),(.*),(.*)'),
-            ('no folder', f'(.*),(.*)'),
-            ('url only', f'(.*)')
-        ]
-
-        for s, r in regex:
-            result = re.search(r, raw_url)
-
-            if result:
-                if s == 'all':
-                    url, name, folder = result.groups()
-
-                if s == 'no folder':
-                    url, name = result.groups()
-                    folder = ''
-
-                if s == 'url only':
-                    url = result.groups()
-                    name = ''
-                    folder = ''
-
-                break
-
-        url = Sanitation.strip_spaces(url)
-        name = Sanitation.strip_spaces(name)
-        folder = Sanitation.strip_spaces(folder)
-
-        return url, name, folder
+        self._log.info(f'Download took {int(time.time() - start)} seconds to complete {url}')
 
     def _url(self, raw: str) -> str:
         return
@@ -386,7 +402,7 @@ class Youtube:
         """Move file including metadata
         """
         try:
-            self._log.info('[_move_file] Moving: {} ({} B)'.format(os.path.split(target)[-1], os.stat(source).st_size))
+            self._log.info(f'Moving: {os.path.split(target)[-1]} ({os.stat(source).st_size} B)')
 
             # copy content, stat-info (mode too), timestamps...
             shutil.copy2(source, target)
@@ -395,10 +411,10 @@ class Youtube:
             os.chown(target, st[stat.ST_UID], st[stat.ST_GID])
             os.remove(source)
 
-            self._log.info('[_move_file] Moved: {}'.format(os.path.split(target)[-1]))
+            self._log.info(f'Moved: {os.path.split(target)[-1]} ({os.stat(source).st_size} B)')
             return True
         except:
-            self._log.error('[_move_file] Failed: {}'.format(os.path.split(source)[-1]))
+            self._log.error(f'Failed to move: {os.path.split(source)[-1]}')
             return False
 
     def _finished(self, finished):
@@ -408,7 +424,7 @@ class Youtube:
             source = os.path.join(self.dir_d, file)
             target = os.path.join(self.dir_f, file)
 
-            self._log.info('[_finished] {}'.format(file))
+            self._log.info(f'Finished {file}')
             self._move_file(source, target)
 
     def _cookie_builder(self, cookies):
