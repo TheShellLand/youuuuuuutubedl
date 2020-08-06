@@ -198,16 +198,16 @@ class Youtube:
 
                     with open(_file, 'r') as f:
                         if 'html' in fext.lower() or 'htm' in fext.lower():  # HTML file
-                            for _ in html_file(f):
-                                urls.append(_)
+                            urls.extend(html_file(f))
 
                         else:
                             for line in f.read().splitlines():  # Regular text file
                                 url = line.strip()
                                 if url == '' or line.startswith('#') or line.startswith('/') or url in urls:
                                     continue
-
-                                if 'youtube.com' in url.lower():
+                                elif 'youtube.com' in url.lower():
+                                    urls.append(url)
+                                elif url:
                                     urls.append(url)
                                 else:
                                     # TODO: bug - Determine whether to parse the page or not
