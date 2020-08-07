@@ -382,15 +382,16 @@ class Youtube:
 
                     if os.path.exists(filepath):
                         if r_type == 'finished':
-                            self.finished.append(filename)
+                            self.finished.append(object, filename)
                             object.download_name = filename
-                            self._finished(object)
                             self._log.info(f'[log ] finished: ({len(self.finished)}/{len(self.downloads)}) {filename}')
                         else:
                             object.download_name = filename
                             # self.downloads.append(object)
                             self._log.info(f'[log ] downloading: ({len(self.finished)}/{len(self.downloads)}) {filename}')
                         break
+
+        self._finished(self.finished)
 
         self._log.info(f'[download ] took {int(time.time() - start)} seconds to complete {url}')
 
@@ -413,21 +414,23 @@ class Youtube:
             self._log.error(f'[moving ] failed {os.path.split(source)[-1]}')
             return False
 
-    def _finished(self, finished: Url):
+    def _finished(self, finished: [(Url, str)]):
         """Move finished download
         """
 
-        source = os.path.join(self.dir_d, finished.download_name)
+        for f, filename in finished:
 
-        if finished.folder:
-            if not os.path.exists(os.path.join(self.dir_f, finished.folder)):
-                os.mkdir(os.path.join(self.dir_f, finished.folder))
-            target = os.path.join(self.dir_f, finished.folder, finished.download_name)
-        else:
-            target = os.path.join(self.dir_f, finished.download_name)
+            source = os.path.join(self.dir_d, filename)
 
-        self._log.info(f'[finished ] {finished}')
-        self._move_file(source, target)
+            if f.folder:
+                if not os.path.exists(os.path.join(self.dir_f, f.folder)):
+                    os.mkdir(os.path.join(self.dir_f, f.folder))
+                destination = os.path.join(self.dir_f, f.folder, filename)
+            else:
+                destination = os.path.join(self.dir_f, filename)
+
+            self._log.info(f'[finished ] {f}')
+            self._move_file(source, destination)
 
     def _cookie_builder(self, cookies):
         """Create a clean list of cookies
