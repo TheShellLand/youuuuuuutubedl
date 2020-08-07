@@ -86,7 +86,8 @@ class Url:
 
     def __eq__(self, other):
         if isinstance(other, Url):
-            return self.url == other.url
+            return (self.url, self.name, self.download_name, self.folder) == \
+                   (other.url, self.name, self.download_name, self.folder)
         else:
             return False
 
@@ -105,7 +106,9 @@ class Youtube:
         self.dir_f = os.path.join(self.path, 'files', 'finished')
         self.dir_p = os.path.join(self.path, 'files', 'pending')
         self.dir_c = os.path.join(self.path, 'files', 'cookies')
+
         _dirs = [self.dir_d, self.dir_f, self.dir_p, self.dir_c]
+
         for directory in _dirs:
             if not os.path.exists(directory):
                 os.makedirs(directory)
@@ -377,13 +380,13 @@ class Youtube:
                         if os.path.exists(filepath):
                             if r_type == 'finished':
                                 self._log.info(f'[log ] finished: {filename}')
+                                object.download_name = filename
                                 if object not in finished:
-                                    object.download_name = filename
                                     finished.append(object)
                             else:
                                 self._log.info(f'[log ] downloading: {filename}')
+                                object.download_name = filename
                                 if object not in downloads:
-                                    object.download_name = filename
                                     downloads.append(object)
                             break
             else:
@@ -393,15 +396,6 @@ class Youtube:
         self._finished(finished)
 
         self._log.info(f'[download ] took {int(time.time() - start)} seconds to complete {url}')
-
-    def _url(self, raw: str) -> str:
-        return
-
-    def _name(self, raw):
-        return
-
-    def _folder(self, raw):
-        return
 
     def _move_file(self, source, target):
         """Move file including metadata
