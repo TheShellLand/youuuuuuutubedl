@@ -123,6 +123,9 @@ class Youtube:
         self.urls = self._url_builder() or list()
         self.cookies = self._cookie_builder(self.dir_c) or list()
 
+        self.downloads = []
+        self.finished = []
+
         # Youtube-dl configuration
         self.yt = os.path.join('bin', 'youtube-dl')
         self.yt_name = f' --get-filename -o {self.dir_d} /%(title)s.%(ext)s'
@@ -339,61 +342,55 @@ class Youtube:
 
         logs = LogHolder()
 
-        finished = []
-        downloads = []
-
         # Download file
         self._log.info(f'[downloading ] {object}')
+        self.downloads.append(object)
         logs.store(run(dl))
 
         # Download audio
         # Requires ffmpeg or avconv and ffprobe or avprobe
         self._log.info(f'[downloading audio ] {object}')
+        self.downloads.append(object)
         logs.store(run(dl_audio))
 
         while True:
 
-            log = logs.pop()
-
-            if log:
-
-                self._log.debug(f'[log ] {log}')
-
-                # find matching downloads
-                for r in regexes:
-
-                    regex = r.get('regex')
-                    r_type = r.get('type')
-
-                    m = re.search(regex, log)
-                    if m:
-                        g = m.group()
-
-                        filename = os.path.split(g)[-1]
-                        filepath = os.path.join(self.dir_d, filename)
-
-                        # don't show line unless it matches
-                        self._log.debug(f'[log ] {log}')
-                        self._log.debug(f'[log ] [regex] {regex}')
-                        self._log.debug(f'[log ] [regex] {filename}')
-
-                        if os.path.exists(filepath):
-                            if r_type == 'finished':
-                                self._log.info(f'[log ] finished: {filename}')
-                                object.download_name = filename
-                                if object not in finished:
-                                    finished.append(object)
-                            else:
-                                self._log.info(f'[log ] downloading: {filename}')
-                                object.download_name = filename
-                                if object not in downloads:
-                                    downloads.append(object)
-                            break
-            else:
+            if len(self.finished) == len(self.downloads):
                 break
 
-        # move all finished files
-        self._finished(finished)
+            log = logs.pop()
+
+            self._log.debug(f'[log ] {log}')
+
+            # find matching downloads
+            for r in regexes:
+
+                regex = r.get('regex')
+                r_type = r.get('type')
+
+                m = re.search(regex, log)
+                if m:
+                    g = m.group()
+
+                    filename = os.path.split(g)[-1]
+                    filepath = os.path.join(self.dir_d, filename)
+
+                    # don't show line unless it matches
+                    self._log.debug(f'[log ] {log}')
+                    self._log.debug(f'[log ] [regex] {regex}')
+                    self._log.debug(f'[log ] [regex] {filename}')
+
+                    if os.path.exists(filepath):
+                        if r_type == 'finished':
+                            self.finished.append(filename)
+                            object.download_name = filename
+                            self._finished(object)
+                            self._log.info(f'[log ] finished: ({len(self.finished)}/{len(self.downloads)}) {filename}')
+                        else:
+                            object.download_name = filename
+                            # self.downloads.append(object)
+                            self._log.info(f'[log ] downloading: ({len(self.finished)}/{len(self.downloads)}) {filename}')
+                        break
 
         self._log.info(f'[download ] took {int(time.time() - start)} seconds to complete {url}')
 
@@ -416,20 +413,21 @@ class Youtube:
             self._log.error(f'[moving ] failed {os.path.split(source)[-1]}')
             return False
 
-    def _finished(self, finished: [Url]):
+    def _finished(self, finished: Url):
         """Move finished download
         """
-        for file in finished:
-            source = os.path.join(self.dir_d, file.download_name)
-            if file.folder:
-                if not os.path.exists(os.path.join(self.dir_f, file.folder)):
-                    os.mkdir(os.path.join(self.dir_f, file.folder))
-                target = os.path.join(self.dir_f, file.folder, file.download_name)
-            else:
-                target = os.path.join(self.dir_f, file.download_name)
 
-            self._log.info(f'[finished ] {file}')
-            self._move_file(source, target)
+        source = os.path.join(self.dir_d, finished.download_name)
+
+        if finished.folder:
+            if not os.path.exists(os.path.join(self.dir_f, finished.folder)):
+                os.mkdir(os.path.join(self.dir_f, finished.folder))
+            target = os.path.join(self.dir_f, finished.folder, finished.download_name)
+        else:
+            target = os.path.join(self.dir_f, finished.download_name)
+
+        self._log.info(f'[finished ] {finished}')
+        self._move_file(source, target)
 
     def _cookie_builder(self, cookies):
         """Create a clean list of cookies
