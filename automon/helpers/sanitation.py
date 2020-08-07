@@ -96,7 +96,7 @@ class Sanitation:
 
     @staticmethod
     def safe_filename(text: str) -> str:
-        allowed_characters = ascii_letters + digits + '''-_.:?'" '''
+        allowed_characters = ascii_letters + digits + '''-_.?'"'''
 
         text = str(text).strip()
         new_text = []
