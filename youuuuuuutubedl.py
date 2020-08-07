@@ -27,18 +27,19 @@ class Url:
     url = str
     name = str
     folder = str
+    download_name = str
 
-    def __init__(self, url: str):
+    def __init__(self, line_file: str):
 
         self._log = Logging(Url.__name__, Logging.DEBUG)
-
-        self._clean = self._prepare_url(url)
+        self._clean = self._prepare_url(line_file)
 
         url, name, folder = self._clean
 
         self.url = url
         self.name = name
         self.folder = folder
+        self.download_name = None
 
         self._log.debug(f'{self.__str__()}')
 
@@ -79,13 +80,13 @@ class Url:
 
     def __str__(self):
         if self.folder or self.name:
-            return f'{self.folder}/{self.name} {self.url}'
+            return f'{self.folder} {self.name} {self.url}'
         else:
             return f'{self.url}'
 
     def __eq__(self, other):
         if isinstance(other, Url):
-            return self.url == self.url
+            return self.url == other.url
         else:
             return False
 
@@ -96,7 +97,7 @@ class Youtube:
         """A multithreaded wrapper for youtube-dl
         """
 
-        self._log = Logging(Youtube.__name__, Logging.DEBUG)
+        self._log = Logging(Youtube.__name__, Logging.INFO)
 
         # Directories
         self.path = os.path.split(os.path.realpath(__file__))[0]
@@ -140,15 +141,15 @@ class Youtube:
         # Run Downloader
         self.futures = list()
         for url in self.urls:
-            self._log.info('[queue] {}'.format(url))
+            self._log.info('[queue ] {}'.format(url))
             self.queue.put(url)
 
         urls = len(self.urls)
 
         if urls > 1:
-            self._log.info('[queue] {} urls added'.format(urls))
+            self._log.info('[queue ] {} urls added'.format(urls))
         else:
-            self._log.info('[queue] {} url added'.format(urls))
+            self._log.info('[queue ] {} url added'.format(urls))
 
         sleep = 0
         while True:
@@ -335,8 +336,8 @@ class Youtube:
 
         logs = LogHolder()
 
-        finished = list()
-        downloads = list()
+        finished = []
+        downloads = []
 
         # Download file
         self._log.info(f'[downloading ] {object}')
@@ -351,7 +352,7 @@ class Youtube:
 
             log = logs.pop()
 
-            if log is not False:
+            if log:
 
                 self._log.debug(f'[log ] {log}')
 
@@ -376,12 +377,14 @@ class Youtube:
                         if os.path.exists(filepath):
                             if r_type == 'finished':
                                 self._log.info(f'[log ] finished: {filename}')
-                                if filename not in finished:
-                                    finished.append(filename)
+                                if object not in finished:
+                                    object.download_name = filename
+                                    finished.append(object)
                             else:
                                 self._log.info(f'[log ] downloading: {filename}')
-                                if filename not in downloads:
-                                    downloads.append(filename)
+                                if object not in downloads:
+                                    object.download_name = filename
+                                    downloads.append(object)
                             break
             else:
                 break
@@ -413,18 +416,23 @@ class Youtube:
             os.chown(target, st[stat.ST_UID], st[stat.ST_GID])
             os.remove(source)
 
-            self._log.info(f'[moved ] {os.path.split(target)[-1]} ({os.stat(source).st_size} B)')
+            self._log.info(f'[moved ] {os.path.split(os.path.split(target)[0])[-1]}/{os.path.split(target)[-1]} ({os.stat(target).st_size} B)')
             return True
         except:
             self._log.error(f'[moving ] failed {os.path.split(source)[-1]}')
             return False
 
-    def _finished(self, finished):
+    def _finished(self, finished: [Url]):
         """Move finished download
         """
         for file in finished:
-            source = os.path.join(self.dir_d, file)
-            target = os.path.join(self.dir_f, file)
+            source = os.path.join(self.dir_d, file.download_name)
+            if file.folder:
+                if not os.path.exists(os.path.join(self.dir_f, file.folder)):
+                    os.mkdir(os.path.join(self.dir_f, file.folder))
+                target = os.path.join(self.dir_f, file.folder, file.download_name)
+            else:
+                target = os.path.join(self.dir_f, file.download_name)
 
             self._log.info(f'[finished ] {file}')
             self._move_file(source, target)
