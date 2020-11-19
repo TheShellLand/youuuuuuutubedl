@@ -74,8 +74,8 @@ class Options:
 
         # Youtube-dl configuration
         self._yt = os.path.join('bin', 'youtube-dl')
-        self._yt_name = f'--get-filename -o {folder} /%(title)s.%(ext)s'
-        self._yt_args = f'-o {folder} /%(title)s.%(ext)s'
+        self._yt_name = f'--get-filename -o {folder}/%(title)s.%(ext)s'
+        self._yt_args = f'-o {folder}/%(title)s.%(ext)s'
 
         self.mp3 = mp3
 
@@ -86,7 +86,7 @@ class Options:
             if name:
                 self.dl = f"{self._yt} -o {os.path.join(folder, name)}.%(ext)s {url}"
             else:
-                self.dl = f'{self._yt} -o {folder} /%(title)s.%(ext)s {url}'
+                self.dl = f'{self._yt} -o {folder}/%(title)s.%(ext)s {url}'
 
         # Requires ffmpeg or avconv and ffprobe or avprobe
         # apt install ffmpeg avconv
