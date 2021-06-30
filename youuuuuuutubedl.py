@@ -19,7 +19,7 @@ from subprocess import PIPE
 from bs4 import BeautifulSoup
 from concurrent.futures import (ThreadPoolExecutor, wait, as_completed)
 
-from automon.log import Logging
+from automon.log.logger import Logging
 from automon.helpers.sanitation import Sanitation
 
 
