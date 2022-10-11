@@ -20,10 +20,20 @@ from bs4 import BeautifulSoup
 from concurrent.futures import (ThreadPoolExecutor, wait, as_completed)
 
 from automon.log.logger import Logging
+from automon.helpers.subprocess import Run
 from automon.helpers.sanitation import Sanitation
 
+# logging
+log_Url = Logging('Url', Logging.DEBUG)
+log_Options = Logging('Options', Logging.DEBUG)
+log_LogStream = Logging('LogStream', Logging.ERROR)
+log_File = Logging('File', Logging.ERROR)
+log_Youtube = Logging('Youtube', Logging.DEBUG)
 
-class Url:
+logging_spaces = 11
+
+
+class Url(object):
     url = str
     name = str
     folder = str
@@ -36,8 +46,6 @@ class Url:
 
     def __init__(self, url: str, name: str, folder: str):
 
-        self._log = Logging(Url.__name__, Logging.DEBUG)
-
         self.url = url
         self.name = name if name else ''
         self.folder = folder if folder else ''
@@ -47,7 +55,7 @@ class Url:
 
         self.files = []
 
-        self._log.debug(f'{self.__str__()}')
+        log_Url.debug(f'{self.__str__()}')
 
     def __str__(self):
         if self.folder and self.name:
@@ -67,15 +75,15 @@ class Url:
             return False
 
 
-class Options:
+class Options(object):
     def __init__(self, folder: str, url_object: Url, mp3: bool = False):
-
-        self._log = Logging(Options.__name__, Logging.DEBUG)
 
         # Youtube-dl configuration
         self._yt = os.path.join('bin', 'youtube-dl')
         self._yt_name = f'--get-filename -o {folder}/%(title)s.%(ext)s'
         self._yt_args = f'-o {folder}/%(title)s.%(ext)s'
+
+        self.python = 'python'
 
         self.mp3 = mp3
 
@@ -84,9 +92,9 @@ class Options:
 
         if not mp3:
             if name:
-                self.dl = f"{self._yt} -o {os.path.join(folder, name)}.%(ext)s {url}"
+                self.dl = f"{self.python} {self._yt} -o {os.path.join(folder, name)}.%(ext)s {url}"
             else:
-                self.dl = f'{self._yt} -o {folder}/%(title)s.%(ext)s {url}'
+                self.dl = f'{self.python} {self._yt} -o {folder}/%(title)s.%(ext)s {url}'
 
         # Requires ffmpeg or avconv and ffprobe or avprobe
         # apt install ffmpeg avconv
@@ -102,11 +110,10 @@ class Options:
         return f'{self.dl}'
 
 
-class LogStream:
+class LogStream(object):
     def __init__(self):
         """Hold a bunch of logs
         """
-        self._log = Logging(LogStream.__name__, Logging.ERROR)
         self.logs = []
         self.errors = []
 
@@ -121,27 +128,26 @@ class LogStream:
         self.logs.extend(output)
         self.errors.extend(error)
 
-        self._log.debug(f'{len(self.logs)} lines')
+        log_LogStream.debug(f'{len(self.logs)} lines')
         if self.errors:
             if len(self.errors) > 5:
-                self._log.error(f'{len(self.errors)} lines')
+                log_LogStream.error(f'{len(self.errors)} lines')
             else:
-                self._log.error(f'{self.errors}')
+                log_LogStream.error(f'{self.errors}')
 
     def pop(self, index=0):
         """Pop a log off the top
         """
         try:
             log = self.logs.pop(index)
-            self._log.debug(log)
+            log_LogStream.debug(log)
             return log
         except:
             return False
 
 
-class File:
+class File(object):
     def __init__(self, url: str, filename: str, folder: str = None, extension: str = None):
-        self._log = Logging(File.__name__, Logging.ERROR)
 
         self.url = url
         self.download_name = filename
@@ -176,7 +182,7 @@ class File:
             m = re.search(regex, log)
 
             if m:
-                self._log.debug(f'[regex] {regex} => {m.group()}')
+                log_File.debug(f'[regex] {regex} => {m.group()}')
                 return m.group()
 
     def get_filename(self, download_path):
@@ -200,7 +206,7 @@ class File:
                     if not self.extension:
                         self.extension = extension
                     self.size = os.stat(filepath).st_size
-                    self._log.info(f'{self.filename}')
+                    log_File.info(f'{self.filename}')
 
     def __str__(self):
         if self.download_name and self.extension and self.folder:
@@ -218,13 +224,11 @@ class File:
             return NotImplemented
 
 
-class Youtube:
+class Youtube(object):
 
     def __init__(self, thread_pool: int = None, urls_file: str = None):
         """A multithreaded wrapper for youtube-dl
         """
-
-        self._log = Logging(Youtube.__name__, Logging.INFO)
 
         # Directories
         self.path = os.path.split(os.path.realpath(__file__))[0]
@@ -245,8 +249,9 @@ class Youtube:
                     # os.remove(self.dir_d + '/' + directory)
                     pass
 
+        self.run = Run()
         self.urls_file = urls_file
-        self.urls = self._url_builder() or []
+        self.urls = self._url_builder()
         self.cookies = self._cookie_builder(self.dir_c) or []
 
         self.downloads = []
@@ -272,7 +277,7 @@ class Youtube:
         for url in self.urls:
             added += 1
             self.queue.put(url)
-            self._log.info(f'[queue] ({added}/{urls}) {url}')
+            log_Youtube.info(f'[{"queue": >{logging_spaces}}] ({added}/{urls}) {url}')
 
         # Send to thread pool
         downloads = 0
@@ -286,13 +291,13 @@ class Youtube:
                 downloads += 1
 
                 # download video
-                options = Options(folder=self.dir_d, url_object=url)
-                self.futures.append(self.pool.submit(self._download, url, options))
+                video_options = Options(folder=self.dir_d, url_object=url)
+                self.futures.append(self.pool.submit(self._download, url, video_options))
 
                 # download mp3
-                options = Options(folder=self.dir_d, url_object=url, mp3=True)
-                self.futures.append(self.pool.submit(self._download, url, options))
-                self._log.info(f'[download] ({downloads}/{urls}) {url}')
+                mp3_options = Options(folder=self.dir_d, url_object=url, mp3=True)
+                self.futures.append(self.pool.submit(self._download, url, mp3_options))
+                log_Youtube.info(f'[{"download": >{logging_spaces}}] ({downloads}/{urls}) {url}')
                 sleep = int(sleep / 2)
             else:
                 sleep += int(sleep + 1 * 2)
@@ -303,10 +308,10 @@ class Youtube:
         """Limit max cpu usage
         """
         if psutil.cpu_percent() < max_cpu_percentage:
-            self._log.debug(f'[cpu ] {psutil.cpu_percent()}%')
+            log_Youtube.debug(f'[{"cpu": >{logging_spaces}}] {psutil.cpu_percent()}%')
             return True
         else:
-            self._log.debug(f'[cpu ] {psutil.cpu_percent()}%')
+            log_Youtube.debug(f'[{"cpu": >{logging_spaces}}] {psutil.cpu_percent()}%')
             return False
 
     def _url_builder(self) -> [Url]:
@@ -388,7 +393,7 @@ class Youtube:
         for item in os.listdir(directory):
             file_ = os.path.join(directory, item)
 
-            self._log.debug(f'[reading ] {file_}')
+            log_Youtube.debug(f'[{"reading": >{logging_spaces}}] {file_}')
 
             if os.path.isfile(file_):
 
@@ -466,10 +471,11 @@ class Youtube:
         """Run a command
         """
         try:
-            self._log.debug(f'[run] {command}')
-            return subprocess.Popen(command.split(), stdout=PIPE, stderr=PIPE).communicate()
+            log_Youtube.debug(f'[{"run": >{logging_spaces}}] {command}')
+            return self.run.run_command(command)
+            # return subprocess.Popen(command.split(), stdout=PIPE, stderr=PIPE).communicate()
         except Exception as e:
-            self._log.error(e)
+            log_Youtube.error(e)
 
     def _download(self, url_object: Url, yt: Options):
         """Download the url
@@ -489,7 +495,7 @@ class Youtube:
         logs = LogStream()
 
         # Download file
-        self._log.debug(f'[downloading ] {name}')
+        log_Youtube.debug(f'[{"downloading": >{logging_spaces}}] {name}')
         self.downloads.append(file.add_logs(logs))
         logs.store(self._run(yt.dl))
 
@@ -497,7 +503,7 @@ class Youtube:
         file.get_filename(self.dir_d)
 
         self._finished(file)
-        self._log.info(f'[download] took {int(time.time() - start)} seconds to complete {url}')
+        log_Youtube.info(f'[{"download": >{logging_spaces}}] took {int(time.time() - start)} seconds to complete {url}')
 
     def _move_file(self, file: File):
         """Move file
@@ -509,7 +515,7 @@ class Youtube:
         source = os.path.join(self.dir_d, filename)
 
         if not os.path.exists(source):
-            self._log.error(f'[move ] source not found: {source}')
+            log_Youtube.error(f'[move ] source not found: {source}')
             return False
 
         if folder:
@@ -522,7 +528,7 @@ class Youtube:
             destination_short = f'{os.path.split(os.path.split(destination)[0])[1]}/{os.path.split(destination)[1]}'
 
         try:
-            self._log.debug(f'[moving ] {os.path.split(destination)[-1]} ({os.stat(source).st_size} B)')
+            log_Youtube.debug(f'[moving ] {os.path.split(destination)[-1]} ({os.stat(source).st_size} B)')
 
             # copy content, stat-info (mode too), timestamps...
             shutil.copy2(source, destination)
@@ -531,18 +537,18 @@ class Youtube:
             os.chown(destination, st[stat.ST_UID], st[stat.ST_GID])
             # os.remove(source)
 
-            self._log.debug(
+            log_Youtube.debug(
                 f'[moved ] {destination_short} ({os.stat(destination).st_size} B)')
             return True
         except Exception as e:
-            self._log.error(f'[moving ] failed {os.path.split(source)[-1]}')
+            log_Youtube.error(f'[moving ] failed {os.path.split(source)[-1]}')
             return False
 
     def _finished(self, file: File):
         """Handle finished download
         """
 
-        self._log.debug(f'[finished ] {file.filename} ({os.stat(os.path.join(self.dir_d, file.filename)).st_size} B)')
+        log_Youtube.debug(f'[finished ] {file.filename} ({os.stat(os.path.join(self.dir_d, file.filename)).st_size} B)')
         self._move_file(file)
 
     def _cookie_builder(self, cookies):
