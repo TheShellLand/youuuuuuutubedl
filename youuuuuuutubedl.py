@@ -257,14 +257,8 @@ class Youtube(object):
         self.downloading = []
         self.finished = []
 
-        # Thread pool
-        if thread_pool:
-            self.pool = thread_pool
-        else:
-            if self.urls:
-                self.pool = ThreadPoolExecutor(len(self.urls))
-            else:
-                self.pool = ThreadPoolExecutor()
+        # Threading pool
+        self.pool = self._config_thread_pool(thread_pool=thread_pool)
 
         # Queue
         self.queue = Queue()
@@ -302,6 +296,18 @@ class Youtube(object):
                 sleep += int(sleep + 1 * 2)
                 # self._log.debug('[_downloader] Sleeping for: {} seconds'.format(sleep))
                 time.sleep(sleep)
+
+    def _config_thread_pool(self, thread_pool):
+        # Thread pool
+        if thread_pool:
+            return ThreadPoolExecutor(max_workers=thread_pool)
+        else:
+            if self.urls:
+                return ThreadPoolExecutor(len(self.urls))
+            else:
+                return ThreadPoolExecutor()
+
+        return False
 
     def _cpu_usage(self, max_cpu_percentage=80):
         """Limit max cpu usage
