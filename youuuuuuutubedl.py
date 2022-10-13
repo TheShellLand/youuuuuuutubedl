@@ -253,52 +253,8 @@ class Youtube(object):
         # Queue
         self.queue = Queue()
 
-        # Add urls to queue
-        added = 0
-        urls = len(self.urls)
-        self.futures = list()
-        for url in self.urls:
-            added += 1
-            self.queue.put(url)
-            log_Youtube.info(f'[{"queue": >{logging_spaces}}] ({added}/{urls}) {url}')
-
-        # Send to thread pool
-        downloads = 0
-        sleep = 0
-        while True:
-            if self.queue.empty():
-                break
-
-            if self._cpu_usage(80):
-                url = self.queue.get()
-                downloads += 1
-
-                # download video
-                video_options = Options(folder=self.dir_d, url_object=url)
-                self.futures.append(self.pool.submit(self._download, url, video_options))
-
-                # download mp3
-                mp3_options = Options(folder=self.dir_d, url_object=url, mp3=True)
-                self.futures.append(self.pool.submit(self._download, url, mp3_options))
-                log_Youtube.info(f'[{"download": >{logging_spaces}}] ({downloads}/{urls}) {url}')
-                sleep = int(sleep / 2)
-            else:
-                sleep += int(sleep + 1 * 2)
-                # self._log.debug('[_downloader] Sleeping for: {} seconds'.format(sleep))
-                time.sleep(sleep)
-
-    def _prepare_folders(self):
-        _dirs = [self.dir_d, self.dir_f, self.dir_p, self.dir_c]
-
-        for directory in _dirs:
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-            if directory == self.dir_d:
-                for directory in os.listdir(self.dir_d):
-                    # Don't delete up previous downloads
-                    # Clean out previous downloads
-                    # os.remove(self.dir_d + '/' + directory)
-                    pass
+        self._queue_urls()
+        self._start_downloads()
 
     def _config_thread_pool(self, thread_pool):
         # Thread pool
