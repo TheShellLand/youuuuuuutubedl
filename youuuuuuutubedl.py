@@ -231,17 +231,17 @@ class Youtube(object):
         """
 
         # Directories
-        self.dir_d = os.path.join('files', 'downloading')
-        self.dir_f = os.path.join('files', 'finished')
-        self.dir_p = os.path.join('files', 'pending')
-        self.dir_c = os.path.join('files', 'cookies')
+        self.dir_downloading = os.path.join('files', 'downloading')
+        self.dir_finished = os.path.join('files', 'finished')
+        self.dir_pending = os.path.join('files', 'pending')
+        self.dir_cookies = os.path.join('files', 'cookies')
 
         self._prepare_folders()
 
         self.run = Run()
         self.urls_file = urls_file
         self.urls = self._url_builder()
-        self.cookies = self._cookie_builder(self.dir_c) or []
+        self.cookies = self._cookie_builder(self.dir_cookies) or []
 
         self.downloads = []
         self.downloading = []
