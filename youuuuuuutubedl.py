@@ -434,13 +434,13 @@ class Youtube(object):
         if not isinstance(raw_url, str) and not raw_url:
             return False
 
-        regex = [
-            ('all', f'(.*),(.*),(.*)'),
-            ('no folder', f'(.*),(.*)'),
-            ('url only', f'(.*)')
-        ]
+        regex = {
+            'all': f'(.*),(.*),(.*)',
+            'no folder': f'(.*),(.*)',
+            'url only': f'(.*)'
+        }
 
-        for s, r in regex:
+        for s, r in regex.items():
             result = re.search(r, raw_url)
 
             if result:
