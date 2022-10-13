@@ -236,17 +236,7 @@ class Youtube(object):
         self.dir_p = os.path.join('files', 'pending')
         self.dir_c = os.path.join('files', 'cookies')
 
-        _dirs = [self.dir_d, self.dir_f, self.dir_p, self.dir_c]
-
-        for directory in _dirs:
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-            if directory == self.dir_d:
-                for directory in os.listdir(self.dir_d):
-                    # Don't delete up previous downloads
-                    # Clean out previous downloads
-                    # os.remove(self.dir_d + '/' + directory)
-                    pass
+        self._prepare_folders()
 
         self.run = Run()
         self.urls_file = urls_file
@@ -296,6 +286,19 @@ class Youtube(object):
                 sleep += int(sleep + 1 * 2)
                 # self._log.debug('[_downloader] Sleeping for: {} seconds'.format(sleep))
                 time.sleep(sleep)
+
+    def _prepare_folders(self):
+        _dirs = [self.dir_d, self.dir_f, self.dir_p, self.dir_c]
+
+        for directory in _dirs:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            if directory == self.dir_d:
+                for directory in os.listdir(self.dir_d):
+                    # Don't delete up previous downloads
+                    # Clean out previous downloads
+                    # os.remove(self.dir_d + '/' + directory)
+                    pass
 
     def _config_thread_pool(self, thread_pool):
         # Thread pool
