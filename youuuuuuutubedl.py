@@ -20,7 +20,7 @@ from bs4 import BeautifulSoup
 from concurrent.futures import (ThreadPoolExecutor, wait, as_completed)
 
 from automon.log.logger import Logging
-from automon.helpers.subprocess import Run
+from automon.helpers.subprocessWrapper import Run
 from automon.helpers.sanitation import Sanitation
 
 # logging
