@@ -410,16 +410,14 @@ class Youtube(object):
                                 if line == '' or line.startswith('#') or line.startswith('/'):
                                     continue
 
-                                url, name, folder = self._prepare_url(line)
-
-                                url_object = Url(url, name, folder)
+                                url_object = self._prepare_url(line)
 
                                 if url_object in urls:
                                     continue
 
                                 if 'youtube.com' in url_object.url.lower():
                                     urls.append(url_object)
-                                elif url:
+                                elif url_object.url:
                                     urls.append(url_object)
                                 else:
                                     # TODO: bug - Determine whether to parse the page or not
@@ -464,7 +462,7 @@ class Youtube(object):
         name = Sanitation.safe_filename(name)
         folder = Sanitation.safe_foldername(folder)
 
-        return url, name, folder
+        return Url(url, name, folder)
 
     def _run(self, command):
         """Run a command
