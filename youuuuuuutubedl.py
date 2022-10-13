@@ -57,7 +57,7 @@ class Url(object):
 
         log_Url.debug(f'{self.__str__()}')
 
-    def __str__(self):
+    def __repr__(self):
         if self.folder and self.name:
             return f'{self.folder} {self.name} {self.url}'
         if self.folder and not self.name:
