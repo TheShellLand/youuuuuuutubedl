@@ -231,11 +231,10 @@ class Youtube(object):
         """
 
         # Directories
-        self.path = os.path.split(os.path.realpath(__file__))[0]
-        self.dir_d = os.path.join(self.path, 'files', 'downloading')
-        self.dir_f = os.path.join(self.path, 'files', 'finished')
-        self.dir_p = os.path.join(self.path, 'files', 'pending')
-        self.dir_c = os.path.join(self.path, 'files', 'cookies')
+        self.dir_d = os.path.join('files', 'downloading')
+        self.dir_f = os.path.join('files', 'finished')
+        self.dir_p = os.path.join('files', 'pending')
+        self.dir_c = os.path.join('files', 'cookies')
 
         _dirs = [self.dir_d, self.dir_f, self.dir_p, self.dir_c]
 
