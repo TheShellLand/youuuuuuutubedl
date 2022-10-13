@@ -485,9 +485,9 @@ class Youtube(object):
         folder = url_object.custom_folder
 
         if yt.mp3:
-            file = File(url, name, folder, '.mp3')
+            file = File(url=url, filename=name, folder=folder, extension='.mp3')
         else:
-            file = File(url, name, folder)
+            file = File(url=url, filename=name, folder=folder)
 
         logs = LogStream()
 
