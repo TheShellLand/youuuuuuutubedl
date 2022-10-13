@@ -30,7 +30,7 @@ log_LogStream = Logging('LogStream', Logging.ERROR)
 log_File = Logging('File', Logging.ERROR)
 log_Youtube = Logging('Youtube', Logging.DEBUG)
 
-logging_spaces = 11
+logging_spaces = 0
 
 
 class Url(object):
