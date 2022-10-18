@@ -251,7 +251,7 @@ class Youtube(object):
         self.queue = Queue()
 
         self._queue_urls()
-        self._start_downloads()
+        self._start_downloads(mp3=False)
 
     def _config_thread_pool(self, thread_pool):
         """Configure threading pool
@@ -463,7 +463,7 @@ class Youtube(object):
         except Exception as e:
             log_Youtube.error(e)
 
-    def _start_downloads(self):
+    def _start_downloads(self, mp3: bool = True):
         """Start downloads in thread pool
         """
         downloads = 0
@@ -480,11 +480,12 @@ class Youtube(object):
                 video_options = Options(folder=self.dir_downloading, url_object=url)
                 self.futures.append(self.thread_pool.submit(self._download, url, video_options))
 
-                # download mp3
-                mp3_options = Options(folder=self.dir_downloading, url_object=url, mp3=True)
-                self.futures.append(self.thread_pool.submit(self._download, url, mp3_options))
-                log_Youtube.info(f'[{"download": >{logging_spaces}}] ({downloads}/{urls}) {url}')
-                sleep = int(sleep / 2)
+                if mp3:
+                    # download mp3
+                    mp3_options = Options(folder=self.dir_downloading, url_object=url, mp3=True)
+                    self.futures.append(self.thread_pool.submit(self._download, url, mp3_options))
+                    log_Youtube.info(f'[{"download": >{logging_spaces}}] ({downloads}/{len(self.urls)}) {url}')
+                    sleep = int(sleep / 2)
             else:
                 sleep += int(sleep + 1 * 2)
                 # self._log.debug('[_downloader] Sleeping for: {} seconds'.format(sleep))
